@@ -1,12 +1,26 @@
-from openai import OpenAI
-from dotenv import load_dotenv
 import os
 import json
+from dotenv import load_dotenv
 from json import JSONDecodeError
+from openai import OpenAI, APIConnectionError, RateLimitError
 load_dotenv()
+
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
+tools = [
+    {
+        "type" : "function",
+        "name" : "stats",
+        "description" : "Dès que je te parle du nombre de messages échangés dans la conversation. Je veux que tu sois juste, que ça soit mes messages où les tiens.",
+        "parameters" : {"type" : "object",
+                        "properties" : {},
+                        "required" : [],
+                        "additionnalProperties": False
+        }
+    }
+]
 
 class Conversation:
     def __init__(self):
@@ -30,8 +44,9 @@ class Conversation:
         self.conversation.append({'role' : role, 'content' : contenu})
     
 class Chatbot:
-    def __init__(self, conversation):
+    def __init__(self, conversation, commande):
         self.conversation = conversation
+        self.commande = commande
 
     def lire_question(self):
         return input('Saisissez votre question .. ')
@@ -39,11 +54,30 @@ class Chatbot:
 
 
     def appel_openai(self):
-        responses = client.responses.create(
-        model = 'gpt-4.1-mini',
-        input = self.conversation.conversation
-        )
-        return responses.output_text
+        try:
+            responses = client.responses.create(
+            model = 'gpt-4.1-mini',
+            input = self.conversation.conversation,
+            tools=tools
+            )
+            for element in responses.output:
+                if element.type == 'function_call' and element.name == 'stats':
+                    resultat = self.commande.stats()
+                    print('[outil stats appelé]')
+                    entree = self.conversation.conversation + [
+                        element,
+                        {"type": "function_call_output", "call_id": element.call_id, "output": resultat}
+                    ]
+                    responses = client.responses.create(
+                        model='gpt-4.1-mini',
+                        input=entree,
+                        tools=tools
+                    )
+            return responses.output_text
+        except APIConnectionError:
+            return "Problème de connexion."
+        except RateLimitError:
+            return "Trop de requêtes ou quota dépassé."
 
 class Commande:
     def __init__(self, conversation):
@@ -80,7 +114,7 @@ class Commande:
                 user += 1
             if nom['role'] == 'assistant':
                 assis += 1
-        print(f"""Statistiques :
+        return (f"""Statistiques :
         Message utilisateur : {user}
         Message assistant : {assis}
         Total : {len(self.conversation.conversation)}
@@ -99,9 +133,9 @@ class Commande:
 conversation = Conversation()
 conversation.charger()
 
-
-chatbot = Chatbot(conversation)
 commande = Commande(conversation)
+chatbot = Chatbot(conversation, commande)
+
 
 
 
@@ -116,8 +150,13 @@ commandes = {
 
 def verif_commandes(question):
     if question in commandes:
-        commandes[question]()
+        resultat = commandes[question]()
+        if resultat:
+            print(resultat)
+
         return True
+
+
 
 
 
