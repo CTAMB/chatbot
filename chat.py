@@ -17,7 +17,23 @@ tools = [
         "parameters" : {"type" : "object",
                         "properties" : {},
                         "required" : [],
-                        "additionnalProperties": False
+                        "additionalProperties": False
+        }
+    },
+    {
+        "type" : "function",
+        "name" : "rechercher",
+        "description" : "Recherche dans l'historique les messages contenant un mot. A utiliser quand l'utilisateur demande s'il a déjà parlé d'un sujet.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "mot": {
+                    "type": "string",
+                    "description": "Le mot à rechercher dans l'historique"
+                }
+            },
+            "required": ["mot"],
+            "additionalProperties": False
         }
     }
 ]
@@ -62,8 +78,8 @@ class Chatbot:
             )
             for element in responses.output:
                 if element.type == 'function_call' and element.name == 'stats':
-                    resultat = self.commande.stats()
                     print('[outil stats appelé]')
+                    resultat = self.commande.stats()
                     entree = self.conversation.conversation + [
                         element,
                         {"type": "function_call_output", "call_id": element.call_id, "output": resultat}
@@ -73,6 +89,24 @@ class Chatbot:
                         input=entree,
                         tools=tools
                     )
+                    return responses.output_text
+
+
+                elif element.type == 'function_call' and element.name == 'rechercher':
+                    print('[outil rechercher appelé]')
+                    arguments = json.loads(element.arguments)
+                    mot = arguments['mot']
+                    resultat = self.commande.rechercher(mot)
+                    entree = self.conversation.conversation + [
+                        element,
+                        {"type": "function_call_output", "call_id": element.call_id, "output": str(resultat)}
+                    ]
+                    responses = client.responses.create(
+                        model='gpt-4.1-mini',
+                        input=entree,
+                        tools=tools
+                    )
+                    return responses.output_text
             return responses.output_text
         except APIConnectionError:
             return "Problème de connexion."
@@ -122,6 +156,16 @@ class Commande:
         )
     def model(self):
         print('gpt-4.1-mini')
+
+    def rechercher(self, mot):
+        liste = []
+        for discussion in self.conversation.conversation:
+            if mot in discussion['content']:
+                liste.append(discussion['content'])
+        if liste:
+            return liste
+        return f"Aucun message avec {mot} dedans."
+
 
 
 
