@@ -1,12 +1,12 @@
 # Chatbot OpenAI
 
-Chatbot utilisant l'API d'OpenAI, a comme possibilité de compter le nombre d'échanges dans la conversation et retrouver les messages qui contiennent un mot, à la demande de l'utilisateur.
+Chatbot utilisant l'API d'OpenAI, a comme possibilité de compter le nombre d'échanges dans la conversation,  retrouver les messages qui contiennent un mot, à la demande de l'utilisateur. Il peut également calculer le montant total de dépenses pour une catégorie.
 
 ## Fonctionnalités
 - Messagerie instantanée avec IA
 - Conversation sauvegardée en JSON
 - Gestion d'erreurs réseau
-- Tool Calling avec deux outils (stats et rechercher)
+- Tool Calling avec trois outils (stats, rechercher et dépenses)
 
 ## Commandes
 - /help : affiche toutes les commandes du chatbot
