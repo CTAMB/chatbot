@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 from dotenv import load_dotenv
 from json import JSONDecodeError
 from openai import OpenAI, APIConnectionError, RateLimitError
@@ -35,7 +36,24 @@ tools = [
             "required": ["mot"],
             "additionalProperties": False
         }
-    }
+    },
+    {
+        "type" : "function",
+        "name" : "depenses",
+        "description" : "Recherche dans le fichier le nombre de dépenses pour la même catégorie et affiche le total du montant",
+        "parameters": {
+            "type" : "object",
+            "properties" : {
+                "categorie": {
+                    "type": "string",
+                    "description" : "la categorie à rechercher dans le fichier csv"
+                }
+            },
+            "required" : ['categorie'],
+            "additionalProperties" : False
+        }
+
+     }
 ]
 
 class Conversation:
@@ -107,6 +125,22 @@ class Chatbot:
                         tools=tools
                     )
                     return responses.output_text
+
+                elif element.type == 'function_call' and element.name == "depenses":
+                    print('[outil dépenses appelé]')
+                    arguments = json.loads(element.arguments)
+                    categorie = arguments['categorie']
+                    resultat = self.commande.depenses(categorie)
+                    entree = self.conversation.conversation + [
+                        element,
+                        {"type": "function_call_output", "call_id": element.call_id, "output": resultat}
+                    ]
+                    responses = client.responses.create(
+                        model = "gpt-4.1-mini",
+                        input=entree,
+                        tools=tools
+                    )
+                    return responses.output_text
             return responses.output_text
         except APIConnectionError:
             return "Problème de connexion."
@@ -165,8 +199,21 @@ class Commande:
         if liste:
             return liste
         return f"Aucun message avec {mot} dedans."
-
-
+    def depenses(self, categorie):
+        with open('depenses.csv', 'r') as f:
+            lecteur = csv.DictReader(f)
+            total = 0
+            c = 0
+            for ligne in lecteur:
+                if ligne["categorie"] == categorie:
+                    total += float(ligne['montant'])
+                    c += 1
+            if c == 0:
+                return f"Aucune dépense trouvée pour la catégorie {categorie}."
+            return f'Total pour {categorie} : {total}€ sur {c} dépenses.'
+                    
+            
+        
 
 
 
